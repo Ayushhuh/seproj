@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Watch Together{% endblock %}
+
+{% block content %}
+<h2 style="margin-bottom: 1.5rem;">Your Dashboard</h2>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3>Your Rooms</h3>
+        <a href="{% url 'create_room' %}" class="btn">Create New Room</a>
+    </div>
+    
+    {% if user_rooms %}
+        <div style="display: grid; gap: 1rem;">
+            {% for room in user_rooms %}
+                <div style="background: #0f3460; padding: 1rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>Room {{ room.id }}</strong>
+                        <p style="color: #aaa; font-size: 0.9rem;">
+                            Video: {{ room.get_video_type_display }} | 
+                            Created: {{ room.created_at|date:"M d, Y" }}
+                        </p>
+                    </div>
+                    <a href="{% url 'room_detail' room.id %}" class="btn btn-secondary">Enter Room</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="color: #aaa;">You haven't created any rooms yet.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h3 style="margin-bottom: 1rem;">Rooms You're Participating In</h3>
+    
+    {% if participating_rooms %}
+        <div style="display: grid; gap: 1rem;">
+            {% for participation in participating_rooms %}
+                {% if participation.room.host != user %}
+                <div style="background: #0f3460; padding: 1rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>Room {{ participation.room.id }}</strong>
+                        <p style="color: #aaa; font-size: 0.9rem;">
+                            Host: {{ participation.room.host.username }} |
+                            Video: {{ participation.room.get_video_type_display }}
+                        </p>
+                    </div>
+                    <a href="{% url 'room_detail' participation.room.id %}" class="btn btn-secondary">Enter Room</a>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="color: #aaa;">You're not participating in any rooms.</p>
+    {% endif %}
+</div>
+{% endblock %}

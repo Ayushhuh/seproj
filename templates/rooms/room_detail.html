@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Room {{ room.id }} - Watch Together{% endblock %}
+
+{% block extra_css %}
+<style>
+    .room-container {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 1rem;
+    }
+    
+    .video-section {
+        background: #16213e;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    
+    .video-player {
+        width: 100%;
+        aspect-ratio: 16/9;
+        background: #000;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+    
+    .video-player iframe,
+    .video-player video {
+        width: 100%;
+        height: 100%;
+        border-radius: 4px;
+    }
+    
+    .controls {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .controls button {
+        padding: 0.5rem 1rem;
+        background: #0f3460;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .controls button:hover {
+        background: #1a4a7a;
+    }
+    
+    .controls button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .sidebar {
+        background: #16213e;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    
+    .room-info {
+        margin-bottom: 1rem;
+    }
+    
+    .room-info h3 {
+        margin-bottom: 0.5rem;
+    }
+    
+    .room-id {
+        background: #0f3460;
+        padding: 0.5rem;
+        border-radius: 4px;
+        font-family: monospace;
+        word-break: break-all;
+    }
+    
+    .copy-link {
+        margin-top: 0.5rem;
+    }
+    
+    .video-selector {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #333;
+    }
+    
+    .video-selector h4 {
+        margin-bottom: 1rem;
+    }
+    
+    .video-selector input[type="url"] {
+        width: 100%;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        background: #0f3460;
+        border: 1px solid #333;
+        border-radius: 4px;
+        color: #eee;
+    }
+    
+    .video-selector input[type="file"] {
+        margin-bottom: 0.5rem;
+    }
+    
+    .participants {
+        margin-top: 1rem;
+    }
+    
+    .participants h4 {
+        margin-bottom: 0.5rem;
+    }
+    
+    .participant-list {
+        list-style: none;
+    }
+    
+    .participant-list li {
+        padding: 0.5rem;
+        background: #0f3460;
+        border-radius: 4px;
+        margin-bottom: 0.25rem;
+    }
+    
+    .participant-list li.host {
+        border-left: 3px solid #e94560;
+    }
+    
+    .sync-status {
+        position: fixed;
+        bottom: 1rem;
+        right: 1rem;
+        background: #16213e;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    
+    .sync-status.connected {
+        border-left: 3px solid #28a745;
+    }
+    
+    .sync-status.disconnected {
+        border-left: 3px solid #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="room-container">
+    <div class="video-section">
+        <div class="video-player" id="video-player">
+            <button id="load-video-btn" onclick="loadVideoNow()" style="padding: 20px; background: #e94560; color: white; border: none; cursor: pointer; font-size: 16px;">LOAD VIDEO</button>
+            <div id="youtube-player-container"></div>
+            {% if room.video_type == 'upload' and room.video_file %}
+                <video id="html5-video" controls>
+                    <source src="{{ room.video_file.url }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            {% endif %}
+        </div>
+        
+        <script>
+        function loadVideoNow() {
+            console.log('Button clicked!');
+            var btn = document.getElementById('load-video-btn');
+            if (btn) btn.style.display = 'none';
+            
+            var videoUrl = '{{ room.video_url|default:"" }}';
+            console.log('Loading video:', videoUrl);
+            
+            if (videoUrl.indexOf('youtube.com') > -1 || videoUrl.indexOf('youtu.be') > -1) {
+                var match = videoUrl.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                var videoId = match ? match[1] : null;
+                console.log('Video ID:', videoId);
+                
+                if (videoId && typeof YT !== 'undefined') {
+                    console.log('Creating player...');
+                    var player = new YT.Player('youtube-player-container', {
+                        videoId: videoId,
+                        playerVars: { autoplay: 1, origin: window.location.origin },
+                        events: {
+                            onReady: function(e) { 
+                                console.log('Player ready!'); 
+                                window._ytPlayer = e.target;
+                            },
+                            onStateChange: function(e) { 
+                                console.log('State:', e.data); 
+                            }
+                        }
+                    });
+                    window._ytPlayer = player;
+                    
+                    // Notify room.js about the player
+                    if (window.roomModule && window.roomModule.setPlayer) {
+                        window.roomModule.setPlayer(player);
+                    }
+                }
+            }
+        }
+        </script>
+        
+        <div class="controls">
+            {% if is_host %}
+                <button id="play-btn" class="btn">Play</button>
+                <button id="pause-btn" class="btn">Pause</button>
+                <input type="number" id="seek-time" placeholder="Time (seconds)" style="width: 150px; padding: 0.5rem; background: #0f3460; border: 1px solid #333; border-radius: 4px; color: #eee;">
+                <button id="seek-btn" class="btn">Seek</button>
+            {% else %}
+                <p style="color: #aaa; font-size: 0.9rem;">Only the host can control playback.</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="sidebar">
+        <div class="room-info">
+            <h3>Room Info</h3>
+            <p>Room ID:</p>
+            <div class="room-id">{{ room.id }}</div>
+            <button id="copy-link-btn" class="btn btn-secondary copy-link" style="margin-top: 0.5rem;">Copy Link</button>
+        </div>
+        
+        {% if is_host %}
+        <div class="video-selector">
+            <h4>Change Video</h4>
+            
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem;">
+                    <input type="radio" name="video_type" value="youtube" {% if room.video_type == 'youtube' %}checked{% endif %}>
+                    YouTube
+                </label>
+                <input type="url" id="youtube-url" placeholder="YouTube URL" value="{{ room.video_url|default:'' }}">
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem;">
+                    <input type="radio" name="video_type" value="upload" {% if room.video_type == 'upload' %}checked{% endif %}>
+                    Upload Video
+                </label>
+                <input type="file" id="video-upload" accept="video/*">
+            </div>
+            
+            <button id="change-video-btn" class="btn">Change Video</button>
+        </div>
+        {% endif %}
+        
+        <div class="participants">
+            <h4>Participants ({{ participants|length }})</h4>
+            <ul class="participant-list">
+                {% for p in participants %}
+                <li class="{% if p.user == room.host %}host{% endif %}">
+                    {{ p.user.username }}
+                    {% if p.user == room.host %}(Host){% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div id="sync-status" class="sync-status disconnected">Connecting...</div>
+
+<input type="hidden" id="room-id" value="{{ room.id }}">
+<input type="hidden" id="is-host" value="{{ is_host|yesno:'true,false' }}">
+<input type="hidden" id="youtube-id" value="{{ youtube_id|default:'' }}">
+<input type="hidden" id="current-video-type" value="{{ room.video_type }}">
+<input type="hidden" id="current-video-url" value="{{ room.video_url|default:'' }}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://www.youtube.com/iframe_api"></script>
+<script src="{% static 'js/player.js' %}"></script>
+<script src="{% static 'js/websocket.js' %}"></script>
+<script src="{% static 'js/room.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var roomId = document.getElementById('room-id').value;
+    var isHost = document.getElementById('is-host').value === 'true';
+    var videoUrl = document.getElementById('current-video-url').value;
+    
+    if (window.roomModule) {
+        window.roomModule.init({
+            roomId: roomId,
+            isHost: isHost,
+            videoUrl: videoUrl
+        });
+    }
+});
+</script>
+{% endblock %}
