@@ -35,6 +35,11 @@ window.roomModule = (function() {
         // Bind controls for ALL users (host controls player, non-host just sees buttons disabled)
         bindPlayerControls();
         bindCopyLink();
+        bindChatControls();
+        loadChatMessages();
+        
+        // Poll for new chat messages every 2 seconds
+        setInterval(loadChatMessages, 2000);
     }
     
     function setupWebSocket() {
@@ -50,6 +55,7 @@ window.roomModule = (function() {
         ws.on('pause', handlePause);
         ws.on('seek', handleSeek);
         ws.on('change_video', handleChangeVideo);
+        ws.on('chat', handleChat);
     }
     
     function bindPlayerControls() {
@@ -260,6 +266,112 @@ window.roomModule = (function() {
     function setPlayer(p) {
         ytPlayer = p;
         console.log('Room: Player set from outside');
+    }
+    
+    function bindChatControls() {
+        var chatInput = document.getElementById('chat-input');
+        var chatSendBtn = document.getElementById('chat-send-btn');
+        
+        if (chatInput) {
+            chatInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') sendChat();
+            });
+        }
+        
+        if (chatSendBtn) {
+            chatSendBtn.addEventListener('click', sendChat);
+        }
+    }
+    
+    function sendChat() {
+        var input = document.getElementById('chat-input');
+        if (!input || !input.value.trim()) return;
+        
+        var message = input.value.trim();
+        input.value = '';
+        
+        // Show message immediately for better UX
+       
+        
+        // Use HTTP API which works reliably
+        fetch('/room/' + roomId + '/chat/send/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            console.log('Room: Chat saved', data);
+            // Try WebSocket for live sync to others
+            if (window.websocketModule && window.websocketModule.sendChat) {
+                window.websocketModule.sendChat(message);
+            }
+        })
+        .catch(function(e) {
+            console.error('Room: Chat error', e);
+        });
+    }
+    
+    var lastChatTime = 0;
+var chatLoaded = false;
+    
+    var lastChatCount = 0;
+var chatLoaded = false;
+
+function loadChatMessages() {
+    fetch('/room/' + roomId + '/chat/', {
+        credentials: 'same-origin'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.messages && data.messages.length > 0) {
+            // On first load, show all messages
+            if (!chatLoaded) {
+                chatLoaded = true;
+                data.messages.forEach(function(msg) {
+                    displayChatMessage(msg);
+                });
+                lastChatCount = data.messages.length;
+            } else if (data.messages.length > lastChatCount) {
+                // On polling, only show NEW messages
+                var newMsgs = data.messages.slice(lastChatCount);
+                newMsgs.forEach(function(msg) {
+                    displayChatMessage(msg);
+                });
+                lastChatCount = data.messages.length;
+            }
+        }
+    })
+    .catch(function(e) {
+        console.error('Room: Chat load error', e);
+    });
+}
+    
+    function displayChatMessage(data) {
+        var container = document.getElementById('chat-messages');
+        if (!container) return;
+        
+        var msgDiv = document.createElement('div');
+        msgDiv.className = 'chat-message';
+        msgDiv.innerHTML = '<span class="username">' + data.username + '</span> <span class="time">' + (data.time || '') + '</span><br><span class="text">' + escapeHtml(data.message) + '</span>';
+        
+        container.appendChild(msgDiv);
+        container.scrollTop = container.scrollHeight;
+    }
+    
+    function handleChat(data) {
+        console.log('Room: Chat', data);
+        displayChatMessage({
+            username: data.username,
+            message: data.message,
+            time: new Date().toLocaleTimeString()
+        });
+    }
+    
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
     
     return { init: init, setPlayer: setPlayer };

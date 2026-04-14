@@ -146,6 +146,63 @@
     .sync-status.disconnected {
         border-left: 3px solid #dc3545;
     }
+    
+    .live-chat {
+        margin-top: 1rem;
+        border-top: 1px solid #333;
+        padding-top: 1rem;
+    }
+    
+    .live-chat h4 {
+        margin-bottom: 0.5rem;
+    }
+    
+    .chat-messages {
+        height: 200px;
+        overflow-y: auto;
+        background: #0f3460;
+        border-radius: 4px;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .chat-message {
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #333;
+    }
+    
+    .chat-message .username {
+        color: #e94560;
+        font-weight: bold;
+        font-size: 0.8rem;
+    }
+    
+    .chat-message .text {
+        color: #eee;
+    }
+    
+    .chat-message .time {
+        color: #666;
+        font-size: 0.7rem;
+    }
+    
+    .chat-input {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .chat-input input {
+        flex: 1;
+        padding: 0.5rem;
+        background: #0f3460;
+        border: 1px solid #333;
+        border-radius: 4px;
+        color: #eee;
+    }
+    
+    .chat-input .btn {
+        padding: 0.5rem 1rem;
+    }
 </style>
 {% endblock %}
 
@@ -223,6 +280,15 @@
             <button id="copy-link-btn" class="btn btn-secondary copy-link" style="margin-top: 0.5rem;">Copy Link</button>
         </div>
         
+        <div class="live-chat">
+            <h4>Live Chat</h4>
+            <div id="chat-messages" class="chat-messages"></div>
+            <div class="chat-input">
+                <input type="text" id="chat-input" placeholder="Type a message...">
+                <button id="chat-send-btn" class="btn">Send</button>
+            </div>
+        </div>
+        
         {% if is_host %}
         <div class="video-selector">
             <h4>Change Video</h4>
@@ -261,7 +327,7 @@
     </div>
 </div>
 
-<div id="sync-status" class="sync-status disconnected">Connecting...</div>
+<div id="sync-status" class="sync-status connected">Connected</div>
 
 <input type="hidden" id="room-id" value="{{ room.id }}">
 <input type="hidden" id="is-host" value="{{ is_host|yesno:'true,false' }}">

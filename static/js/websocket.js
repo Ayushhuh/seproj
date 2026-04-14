@@ -48,6 +48,10 @@ window.websocketModule = (function() {
                 else if (data.type === 'pause' && handlers.pause) handlers.pause(data.timestamp);
                 else if (data.type === 'seek' && handlers.seek) handlers.seek(data.timestamp);
                 else if (data.type === 'change_video' && handlers.change_video) handlers.change_video(data.video_type, data.video_url);
+                else if (data.type === 'chat') {
+                    console.log('WS: Chat message received', data);
+                    if (handlers.chat) handlers.chat(data);
+                }
             } catch(err) {
                 console.error('WS: Parse error', err);
             }
@@ -74,6 +78,7 @@ window.websocketModule = (function() {
     function sendPause(time) { send('pause', { timestamp: time }); }
     function sendSeek(time) { send('seek', { timestamp: time }); }
     function sendChangeVideo(type, url) { send('change_video', { video_type: type, video_url: url }); }
+    function sendChat(message) { send('chat', { message: message }); }
     
     function on(type, handler) {
         handlers[type] = handler;
@@ -81,7 +86,7 @@ window.websocketModule = (function() {
     
     return {
         connect: connect, send: send,
-        sendPlay: sendPlay, sendPause: sendPause, sendSeek: sendSeek, sendChangeVideo: sendChangeVideo,
+        sendPlay: sendPlay, sendPause: sendPause, sendSeek: sendSeek, sendChangeVideo: sendChangeVideo, sendChat: sendChat,
         on: on
     };
 })();

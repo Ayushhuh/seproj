@@ -3,7 +3,7 @@ import asyncio
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from rooms.models import Room, Participant
+from rooms.models import Room, Participant, ChatMessage
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,25 @@ class RoomConsumer(AsyncWebsocketConsumer):
             return
         
         data = json.loads(text_data)
+        msg_type = data.get('type')
+        
+        # Handle chat messages - anyone in room can send
+        if msg_type == 'chat':
+            message = data.get('message', '').strip()
+            if message:
+                username = self.user.username
+                # Save to database
+                await self.save_chat_message(message)
+                # Broadcast to all
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'broadcast_chat',
+                        'username': username,
+                        'message': message,
+                    }
+                )
+            return
         
         # Handle video change events
         if data.get('type') == 'change_video':
@@ -98,6 +117,14 @@ class RoomConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': event['event_type'],
             'timestamp': event['timestamp'],
+        }))
+    
+    async def broadcast_chat(self, event):
+        logger.info(f"Broadcasting chat: {event}")
+        await self.send(text_data=json.dumps({
+            'type': 'chat',
+            'username': event['username'],
+            'message': event['message'],
         }))
     
     async def video_changed(self, event):
@@ -160,5 +187,13 @@ class RoomConsumer(AsyncWebsocketConsumer):
             room.current_time = 0
             room.is_playing = False
             room.save()
+        except Room.DoesNotExist:
+            pass
+    
+    @database_sync_to_async
+    def save_chat_message(self, message):
+        try:
+            room = Room.objects.get(id=self.room_id)
+            ChatMessage.objects.create(room=room, user=self.user, message=message)
         except Room.DoesNotExist:
             pass
